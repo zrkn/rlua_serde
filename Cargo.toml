@@ -2,6 +2,10 @@
 name = "rlua_serde"
 version = "0.1.0"
 authors = ["zrkn <zrkn@email.su>"]
+description = "Serde (De)serializer implementation for rlua Value"
+repository = "https://github.com/zrkn/rlua_serde/"
+readme = "README.md"
+keywords = ["lua", "serde"]
 
 [dependencies]
 rlua  = "0.12"
