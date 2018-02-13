@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["zrkn <zrkn@email.su>"]
 
 [dependencies]
-rlua  = "0.10"
+rlua  = "0.12"
 serde = "1.0"
 
 [dev-dependencies]
