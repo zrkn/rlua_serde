@@ -9,7 +9,7 @@ keywords = ["lua", "serde"]
 license = "MIT"
 
 [dependencies]
-rlua  = "0.12"
+rlua  = "0.14"
 serde = "1.0"
 
 [dev-dependencies]
