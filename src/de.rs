@@ -259,7 +259,7 @@ mod tests {
         let expected = Test { int: 1, seq: vec!["a".to_owned(), "b".to_owned()] };
 
         let lua = Lua::new();
-        let value = lua.exec::<Value>(
+        let value = lua.exec::<_, Value>(
             r#"
                 a = {}
                 a.int = 1
@@ -286,7 +286,7 @@ mod tests {
         let lua = Lua::new();
 
         let expected = E::Unit;
-        let value = lua.exec::<Value>(
+        let value = lua.exec::<_, Value>(
             r#"
                 return "Unit"
             "#,
@@ -297,7 +297,7 @@ mod tests {
 
 
         let expected = E::Newtype(1);
-        let value = lua.exec::<Value>(
+        let value = lua.exec::<_, Value>(
             r#"
                 a = {}
                 a["Newtype"] = 1
@@ -309,7 +309,7 @@ mod tests {
         assert_eq!(expected, got);
 
         let expected = E::Tuple(1, 2);
-        let value = lua.exec::<Value>(
+        let value = lua.exec::<_, Value>(
             r#"
                 a = {}
                 a["Tuple"] = {1, 2}
@@ -321,7 +321,7 @@ mod tests {
         assert_eq!(expected, got);
 
         let expected = E::Struct { a: 1 };
-        let value = lua.exec::<Value>(
+        let value = lua.exec::<_, Value>(
             r#"
                 a = {}
                 a["Struct"] = {}

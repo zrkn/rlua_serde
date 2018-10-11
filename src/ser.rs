@@ -380,7 +380,7 @@ mod tests {
         let lua = Lua::new();
         let value = to_value(&lua, &test).unwrap();
         lua.globals().set("value", value).unwrap();
-        lua.exec::<()>(
+        lua.exec::<_, ()>(
             r#"
                 assert(value["int"] == 1)
                 assert(value["seq"][1] == "a")
@@ -405,7 +405,7 @@ mod tests {
         let u = E::Unit;
         let value = to_value(&lua, &u).unwrap();
         lua.globals().set("value", value).unwrap();
-        lua.exec::<()>(
+        lua.exec::<_, ()>(
             r#"
                 assert(value == "Unit")
             "#,
@@ -415,7 +415,7 @@ mod tests {
         let n = E::Newtype(1);
         let value = to_value(&lua, &n).unwrap();
         lua.globals().set("value", value).unwrap();
-        lua.exec::<()>(
+        lua.exec::<_, ()>(
             r#"
                 assert(value["Newtype"] == 1)
             "#,
@@ -425,7 +425,7 @@ mod tests {
         let t = E::Tuple(1, 2);
         let value = to_value(&lua, &t).unwrap();
         lua.globals().set("value", value).unwrap();
-        lua.exec::<()>(
+        lua.exec::<_, ()>(
             r#"
                 assert(value["Tuple"][1] == 1)
                 assert(value["Tuple"][2] == 2)
@@ -436,7 +436,7 @@ mod tests {
         let s = E::Struct { a: 1 };
         let value = to_value(&lua, &s).unwrap();
         lua.globals().set("value", value).unwrap();
-        lua.exec::<()>(
+        lua.exec::<_, ()>(
             r#"
                 assert(value["Struct"]["a"] == 1)
             "#,
