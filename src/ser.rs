@@ -1,13 +1,13 @@
 use serde;
 
-use rlua::{Lua, Value, Table, String as LuaString};
+use rlua::{Context, Lua, Value, Table, String as LuaString};
 
 use to_value;
 use error::{Error, Result};
 
 
 pub struct Serializer<'lua> {
-    pub lua: &'lua Lua,
+    pub lua: Context<'lua>,
 }
 
 impl<'lua> serde::Serializer for Serializer<'lua> {
@@ -208,7 +208,7 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
 
 
 pub struct SerializeVec<'lua> {
-    lua: &'lua Lua,
+    lua: Context<'lua>,
     table: Table<'lua>,
     idx: u64,
 }
@@ -262,7 +262,7 @@ impl<'lua> serde::ser::SerializeTupleStruct for SerializeVec<'lua> {
 
 
 pub struct SerializeTupleVariant<'lua> {
-    lua: &'lua Lua,
+    lua: Context<'lua>,
     name: LuaString<'lua>,
     table: Table<'lua>,
     idx: u64,
@@ -289,7 +289,7 @@ impl<'lua> serde::ser::SerializeTupleVariant for SerializeTupleVariant<'lua> {
 
 
 pub struct SerializeMap<'lua> {
-    lua: &'lua Lua,
+    lua: Context<'lua>,
     table: Table<'lua>,
     next_key: Option<Value<'lua>>
 }
@@ -339,7 +339,7 @@ impl<'lua> serde::ser::SerializeStruct for SerializeMap<'lua> {
 
 
 pub struct SerializeStructVariant<'lua> {
-    lua: &'lua Lua,
+    lua: Context<'lua>,
     name: LuaString<'lua>,
     table: Table<'lua>,
 }
@@ -378,16 +378,16 @@ mod tests {
         let test = Test { int: 1, seq: vec!["a", "b"] };
 
         let lua = Lua::new();
-        let value = to_value(&lua, &test).unwrap();
-        lua.globals().set("value", value).unwrap();
-        lua.exec::<_, ()>(
-            r#"
+        lua.context(|lua| {
+            let value = to_value(lua, &test).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(
+                r#"
                 assert(value["int"] == 1)
                 assert(value["seq"][1] == "a")
                 assert(value["seq"][2] == "b")
-            "#,
-            None,
-        ).unwrap();
+            "#).exec()
+        }).unwrap()
     }
 
     #[test]
@@ -402,45 +402,35 @@ mod tests {
 
         let lua = Lua::new();
 
-        let u = E::Unit;
-        let value = to_value(&lua, &u).unwrap();
-        lua.globals().set("value", value).unwrap();
-        lua.exec::<_, ()>(
-            r#"
+        lua.context(|lua| {
+            let u = E::Unit;
+            let value = to_value(lua, &u).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
                 assert(value == "Unit")
-            "#,
-            None,
-        ).unwrap();
+            "#).exec().unwrap();
 
-        let n = E::Newtype(1);
-        let value = to_value(&lua, &n).unwrap();
-        lua.globals().set("value", value).unwrap();
-        lua.exec::<_, ()>(
-            r#"
+            let n = E::Newtype(1);
+            let value = to_value(lua, &n).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
                 assert(value["Newtype"] == 1)
-            "#,
-            None,
-        ).unwrap();
+            "#).exec().unwrap();
 
-        let t = E::Tuple(1, 2);
-        let value = to_value(&lua, &t).unwrap();
-        lua.globals().set("value", value).unwrap();
-        lua.exec::<_, ()>(
-            r#"
+            let t = E::Tuple(1, 2);
+            let value = to_value(lua, &t).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
                 assert(value["Tuple"][1] == 1)
                 assert(value["Tuple"][2] == 2)
-            "#,
-            None,
-        ).unwrap();
+            "#).exec().unwrap();
 
-        let s = E::Struct { a: 1 };
-        let value = to_value(&lua, &s).unwrap();
-        lua.globals().set("value", value).unwrap();
-        lua.exec::<_, ()>(
-            r#"
+            let s = E::Struct { a: 1 };
+            let value = to_value(lua, &s).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
                 assert(value["Struct"]["a"] == 1)
-            "#,
-            None,
-        ).unwrap();
+            "#).exec()
+        }).unwrap();
     }
 }
