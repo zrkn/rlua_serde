@@ -1,6 +1,6 @@
 use serde;
 
-use rlua::{Context, Lua, Value, Table, String as LuaString};
+use rlua::{Context, Value, Table, String as LuaString};
 
 use to_value;
 use error::{Error, Result};
@@ -365,6 +365,7 @@ impl<'lua> serde::ser::SerializeStructVariant for SerializeStructVariant<'lua> {
 
 #[cfg(test)]
 mod tests {
+    use rlua::Lua;
     use super::*;
 
     #[test]

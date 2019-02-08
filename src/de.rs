@@ -246,7 +246,6 @@ mod tests {
     use rlua::Lua;
 
     use from_value;
-    use super::*;
 
     #[test]
     fn test_struct() {
