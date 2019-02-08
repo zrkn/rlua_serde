@@ -20,20 +20,20 @@
 //!     }
 //!
 //!     let lua = rlua::Lua::new();
-//!     let foo = Foo {
-//!         bar: 42,
-//!         baz: vec![String::from("fizz"), String::from("buzz")],
-//!     };
+//!     lua.context(|lua| {
+//!         let foo = Foo {
+//!             bar: 42,
+//!             baz: vec![String::from("fizz"), String::from("buzz")],
+//!         };
 //!
-//!     let value = rlua_serde::to_value(&lua, &foo).unwrap();
-//!     lua.globals().set("value", value).unwrap();
-//!     lua.exec::<_, ()>(
-//!         r#"
-//!             assert(value["bar"] == 42)
-//!             assert(value["baz"][2] == "buzz")
-//!         "#,
-//!         None,
-//!     ).unwrap()
+//!         let value = rlua_serde::to_value(lua, &foo).unwrap();
+//!         lua.globals().set("value", value).unwrap();
+//!         lua.load(
+//!             r#"
+//!                 assert(value["bar"] == 42)
+//!                 assert(value["baz"][2] == "buzz")
+//!             "#).exec().unwrap();
+//!     });
 //! }
 //! ```
 
@@ -49,10 +49,10 @@ pub mod ser;
 pub mod de;
 
 
-use rlua::{Lua, Value, Error};
+use rlua::{Context, Value, Error};
 
 
-pub fn to_value<T: serde::Serialize>(lua: &Lua, t: T) -> Result<Value, Error> {
+pub fn to_value<'lua, T: serde::Serialize>(lua: Context<'lua>, t: T) -> Result<Value<'lua>, Error> {
     let serializer = ser::Serializer { lua };
     Ok(t.serialize(serializer)?)
 }

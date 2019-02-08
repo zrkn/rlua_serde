@@ -259,17 +259,16 @@ mod tests {
         let expected = Test { int: 1, seq: vec!["a".to_owned(), "b".to_owned()] };
 
         let lua = Lua::new();
-        let value = lua.exec::<_, Value>(
-            r#"
+        lua.context(|lua| {
+            let value = lua.load(r#"
                 a = {}
                 a.int = 1
                 a.seq = {"a", "b"}
                 return a
-            "#,
-            None,
-        ).unwrap();
-        let got = from_value(value).unwrap();
-        assert_eq!(expected, got);
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+        });
     }
 
 
@@ -284,53 +283,46 @@ mod tests {
         }
 
         let lua = Lua::new();
-
-        let expected = E::Unit;
-        let value = lua.exec::<_, Value>(
-            r#"
+        lua.context(|lua| {
+            let expected = E::Unit;
+            let value = lua.load(
+                r#"
                 return "Unit"
-            "#,
-            None,
-        ).unwrap();
-        let got = from_value(value).unwrap();
-        assert_eq!(expected, got);
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
 
 
-        let expected = E::Newtype(1);
-        let value = lua.exec::<_, Value>(
-            r#"
+            let expected = E::Newtype(1);
+            let value = lua.load(
+                r#"
                 a = {}
                 a["Newtype"] = 1
                 return a
-            "#,
-            None,
-        ).unwrap();
-        let got = from_value(value).unwrap();
-        assert_eq!(expected, got);
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
 
-        let expected = E::Tuple(1, 2);
-        let value = lua.exec::<_, Value>(
-            r#"
+            let expected = E::Tuple(1, 2);
+            let value = lua.load(
+                r#"
                 a = {}
                 a["Tuple"] = {1, 2}
                 return a
-            "#,
-            None,
-        ).unwrap();
-        let got = from_value(value).unwrap();
-        assert_eq!(expected, got);
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
 
-        let expected = E::Struct { a: 1 };
-        let value = lua.exec::<_, Value>(
-            r#"
+            let expected = E::Struct { a: 1 };
+            let value = lua.load(
+                r#"
                 a = {}
                 a["Struct"] = {}
                 a["Struct"]["a"] = 1
                 return a
-            "#,
-            None,
-        ).unwrap();
-        let got = from_value(value).unwrap();
-        assert_eq!(expected, got);
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+        });
     }
 }
