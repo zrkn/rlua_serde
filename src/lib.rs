@@ -52,7 +52,7 @@ pub mod de;
 use rlua::{Context, Value, Error};
 
 
-pub fn to_value<'lua, T: serde::Serialize>(lua: Context<'lua>, t: T) -> Result<Value<'lua>, Error> {
+pub fn to_value<T: serde::Serialize>(lua: Context, t: T) -> Result<Value, Error> {
     let serializer = ser::Serializer { lua };
     Ok(t.serialize(serializer)?)
 }

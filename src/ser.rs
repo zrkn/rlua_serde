@@ -29,17 +29,17 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
 
     #[inline]
     fn serialize_i8(self, value: i8) -> Result<Value<'lua>> {
-        self.serialize_i64(value as i64)
+        self.serialize_i64(i64::from(value))
     }
 
     #[inline]
     fn serialize_i16(self, value: i16) -> Result<Value<'lua>> {
-        self.serialize_i64(value as i64)
+        self.serialize_i64(i64::from(value))
     }
 
     #[inline]
     fn serialize_i32(self, value: i32) -> Result<Value<'lua>> {
-        self.serialize_i64(value as i64)
+        self.serialize_i64(i64::from(value))
     }
 
     #[inline]
@@ -49,17 +49,17 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
 
     #[inline]
     fn serialize_u8(self, value: u8) -> Result<Value<'lua>> {
-        self.serialize_i64(value as i64)
+        self.serialize_i64(i64::from(value))
     }
 
     #[inline]
     fn serialize_u16(self, value: u16) -> Result<Value<'lua>> {
-        self.serialize_i64(value as i64)
+        self.serialize_i64(i64::from(value))
     }
 
     #[inline]
     fn serialize_u32(self, value: u32) -> Result<Value<'lua>> {
-        self.serialize_i64(value as i64)
+        self.serialize_i64(i64::from(value))
     }
 
     #[inline]
@@ -69,7 +69,7 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
 
     #[inline]
     fn serialize_f32(self, value: f32) -> Result<Value<'lua>> {
-        self.serialize_f64(value as f64)
+        self.serialize_f64(f64::from(value))
     }
 
     #[inline]
