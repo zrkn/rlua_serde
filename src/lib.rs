@@ -1,5 +1,5 @@
 //! This crate allows you to serialize and deserialize any type that implements
-//! `serde::Serialize` and `serde::Deserialzie` into/from `rlua::Value`.
+//! `serde::Serialize` and `serde::Deserialize` into/from `rlua::Value`.
 //!
 //! Implementation is similar to `serde_json::Value`
 //!
