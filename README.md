@@ -12,7 +12,7 @@ More information about this crate can be found in the [crate documentation][dox]
 
 ## Usage
 
-To use `eventd`, first add this to your `Cargo.toml`:
+To use `rlua_serde`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
