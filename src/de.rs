@@ -23,17 +23,7 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
             Value::Integer(v) => visitor.visit_i64(v),
             Value::Number(v) => visitor.visit_f64(v),
             Value::String(v) => visitor.visit_str(v.to_str()?),
-            Value::Table(v) => if v.contains_key(1)? {
-                let len = v.len()? as usize;
-                let mut deserializer = SeqDeserializer(v.sequence_values());
-                let seq = visitor.visit_seq(&mut deserializer)?;
-                let remaining = deserializer.0.count();
-                if remaining == 0 {
-                    Ok(seq)
-                } else {
-                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
-                }
-            } else {
+            Value::Table(v) => {
                 let len = v.len()? as usize;
                 let mut deserializer = MapDeserializer(v.pairs(), None);
                 let map = visitor.visit_map(&mut deserializer)?;
@@ -90,9 +80,29 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
         visitor.visit_enum(EnumDeserializer { variant, value })
     }
 
+    #[inline]
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
+        where V: serde::de::Visitor<'de>
+    {
+        match self.value {
+            Value::Table(v) => {
+                let len = v.len()? as usize;
+                let mut deserializer = SeqDeserializer(v.sequence_values());
+                let seq = visitor.visit_seq(&mut deserializer)?;
+                let remaining = deserializer.0.count();
+                if remaining == 0 {
+                    Ok(seq)
+                } else {
+                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                }
+            }
+            _ => Err(serde::de::Error::custom("invalid value type")),
+        }
+    }
+
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes
-        byte_buf unit unit_struct newtype_struct seq tuple
+        byte_buf unit unit_struct newtype_struct tuple
         tuple_struct map struct identifier ignored_any
     }
 }
@@ -253,16 +263,26 @@ mod tests {
         struct Test {
             int: u32,
             seq: Vec<String>,
+            map: std::collections::HashMap<i32, i32>,
+            empty: Vec<()>,
         }
 
-        let expected = Test { int: 1, seq: vec!["a".to_owned(), "b".to_owned()] };
+        let expected = Test {
+            int: 1,
+            seq: vec!["a".to_owned(), "b".to_owned()],
+            map: vec![(1, 2), (4, 1)].into_iter().collect(),
+            empty: vec![]
+        };
 
+        println!("{:?}", expected);
         let lua = Lua::new();
         lua.context(|lua| {
             let value = lua.load(r#"
                 a = {}
                 a.int = 1
                 a.seq = {"a", "b"}
+                a.map = {2, [4]=1}
+                a.empty = {}
                 return a
             "#).eval().unwrap();
             let got = from_value(value).unwrap();
