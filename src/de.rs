@@ -100,10 +100,24 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
         }
     }
 
+    #[inline]
+    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
+        where V: serde::de::Visitor<'de>
+    {
+        self.deserialize_seq(visitor)
+    }
+
+    #[inline]
+    fn deserialize_tuple_struct<V>(self, _name: &'static str, _len: usize, visitor: V) -> Result<V::Value>
+        where V: serde::de::Visitor<'de>
+    {
+        self.deserialize_seq(visitor)
+    }
+
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes
-        byte_buf unit unit_struct newtype_struct tuple
-        tuple_struct map struct identifier ignored_any
+        byte_buf unit unit_struct newtype_struct
+        map struct identifier ignored_any
     }
 }
 
@@ -290,6 +304,32 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_tuple() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct Rgb(u8, u8, u8);
+
+        let lua = Lua::new();
+        lua.context(|lua| {
+            let expected = Rgb(1, 2, 3);
+            let value = lua.load(
+                r#"
+                a = {1, 2, 3}
+                return a
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+
+            let expected = (1, 2, 3);
+            let value = lua.load(
+                r#"
+                a = {1, 2, 3}
+                return a
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+        });
+    }
 
     #[test]
     fn test_enum() {
