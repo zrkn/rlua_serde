@@ -16,7 +16,7 @@ To use `rlua_serde`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlua_serde = "0.3"
+rlua_serde = "0.4"
 ```
 
 Next, you can use `to_value`/`from_value` functions to serialize/deserialize:
