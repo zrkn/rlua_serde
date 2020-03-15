@@ -1,7 +1,7 @@
 use serde;
 use serde::de::IntoDeserializer;
 
-use rlua::{Value, TablePairs, TableSequence};
+use rlua::{Value, Table, TablePairs, TableSequence};
 
 use error::{Error, Result};
 
@@ -23,16 +23,17 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
             Value::Integer(v) => visitor.visit_i64(v),
             Value::Number(v) => visitor.visit_f64(v),
             Value::String(v) => visitor.visit_str(v.to_str()?),
-            Value::Table(v) => {
-                let len = v.len()? as usize;
-                let mut deserializer = MapDeserializer(v.pairs(), None);
-                let map = visitor.visit_map(&mut deserializer)?;
-                let remaining = deserializer.0.count();
-                if remaining == 0 {
-                    Ok(map)
-                } else {
-                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+            Value::Table(ref v) => {
+                let mut len = v.clone().pairs::<Value, Value>().count();
+                for i in 1..=len {
+                    if !v.contains_key(i)? {
+                        len += 1
+                    }
                 }
+                if v.len()? as usize != len {
+                    return self.deserialize_map(visitor)
+                }
+                self.deserialize_tuple(len, visitor)
             },
             _ => Err(serde::de::Error::custom("invalid value type")),
         }
@@ -101,23 +102,51 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
     }
 
     #[inline]
-    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value>
         where V: serde::de::Visitor<'de>
     {
-        self.deserialize_seq(visitor)
+        match self.value {
+            Value::Table(v) => {
+                let mut deserializer = TupleDeserializer(v, 1..=len);
+                let seq = visitor.visit_seq(&mut deserializer)?;
+                Ok(seq)
+            }
+            _ => Err(serde::de::Error::custom("invalid value type")),
+        }
     }
 
     #[inline]
-    fn deserialize_tuple_struct<V>(self, _name: &'static str, _len: usize, visitor: V) -> Result<V::Value>
+    fn deserialize_tuple_struct<V>(self, _name: &'static str, len: usize, visitor: V) -> Result<V::Value>
         where V: serde::de::Visitor<'de>
     {
-        self.deserialize_seq(visitor)
+        self.deserialize_tuple(len, visitor)
+    }
+
+    #[inline]
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
+        where V: serde::de::Visitor<'de>
+    {
+        match self.value {
+            Value::Table(v) => {
+                let mut deserializer = MapDeserializer(v.pairs(), None);
+                let map = visitor.visit_map(&mut deserializer)?;
+                Ok(map)
+            }
+            _ => Err(serde::de::Error::custom("invalid value type")),
+        }
+    }
+
+    #[inline]
+    fn deserialize_struct<V>(self, _name: &'static str, _fields: &'static [&'static str], visitor: V) -> Result<V::Value>
+        where V: serde::de::Visitor<'de>
+    {
+        self.deserialize_map(visitor)
     }
 
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes
         byte_buf unit unit_struct newtype_struct
-        map struct identifier ignored_any
+        identifier ignored_any
     }
 }
 
@@ -142,6 +171,27 @@ impl<'lua, 'de> serde::de::SeqAccess<'de> for SeqDeserializer<'lua> {
             (lower, Some(upper)) if lower == upper => Some(upper),
             _ => None,
         }
+    }
+}
+
+
+struct TupleDeserializer<'lua>(Table<'lua>, std::ops::RangeInclusive<usize>);
+
+impl<'lua, 'de> serde::de::SeqAccess<'de> for TupleDeserializer<'lua> {
+    type Error = Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
+        where T: serde::de::DeserializeSeed<'de>
+    {
+        match self.1.next() {
+            Some(i) => seed.deserialize(Deserializer { value: self.0.get(i)? })
+                            .map(Some),
+            None => Ok(None)
+        }
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(*self.1.end())
     }
 }
 
@@ -268,7 +318,6 @@ impl<'lua, 'de> serde::de::VariantAccess<'de> for VariantDeserializer<'lua> {
 #[cfg(test)]
 mod tests {
     use rlua::Lua;
-
     use from_value;
 
     #[test]
@@ -305,6 +354,67 @@ mod tests {
     }
 
     #[test]
+    fn test_any() {
+        use serde::private::de::Content;
+        let lua = Lua::new();
+        lua.context(|lua| {
+            let expected = Content::Seq(vec![Content::I64(10), Content::I64(20), Content::I64(30), Content::I64(40)]);
+            let value = lua.load(
+                r#"
+                a = {10, 20, 30}
+                a[4] = 40
+                return a
+            "#).eval().unwrap();
+            let got = from_value::<Content>(value).unwrap();
+            assert_eq!(format!("{:?}", expected), format!("{:?}", got));
+
+            let expected = Content::Seq(vec![Content::I64(10), Content::Unit, Content::I64(30)]);
+            let value = lua.load(
+                r#"
+                a = {10, 20, 30}
+                a[2] = nil
+                return a
+            "#).eval().unwrap();
+            let got = from_value::<Content>(value).unwrap();
+            assert_eq!(format!("{:?}", expected), format!("{:?}", got));
+
+            let expected = Content::Seq(vec![Content::I64(10), Content::I64(20)]);
+            let value = lua.load(
+                r#"
+                a = {10, 20, 30}
+                a[3] = nil
+                return a
+            "#).eval().unwrap();
+            let got = from_value::<Content>(value).unwrap();
+            assert_eq!(format!("{:?}", expected), format!("{:?}", got));
+
+            let expected = Content::Map(vec![(Content::I64(1), Content::I64(10)), (Content::I64(3), Content::I64(30))]);
+            let value = lua.load(
+                r#"
+                a = {}
+                a[1] = 10
+                a[3] = 30
+                return a
+            "#).eval().unwrap();
+            let got = from_value::<Content>(value).unwrap();
+            assert_eq!(format!("{:?}", expected), format!("{:?}", got));
+
+            let expected = Content::Map(vec![
+                (Content::I64(2), Content::I64(20)),
+                (Content::I64(3), Content::I64(30)),
+                (Content::String("a".to_string()), Content::I64(1)),
+            ]);
+            let value = lua.load(
+                r#"
+                a = {nil, 20, 30, a=1}
+                return a
+            "#).eval().unwrap();
+            let got = from_value::<Content>(value).unwrap();
+            assert_eq!(format!("{:?}", expected), format!("{:?}", got));
+        });
+    }
+
+    #[test]
     fn test_tuple() {
         #[derive(Deserialize, PartialEq, Debug)]
         struct Rgb(u8, u8, u8);
@@ -337,6 +447,7 @@ mod tests {
         enum E {
             Unit,
             Newtype(u32),
+            Array(Vec<u32>),
             Tuple(u32, u32),
             Struct { a: u32 },
         }
@@ -351,12 +462,21 @@ mod tests {
             let got = from_value(value).unwrap();
             assert_eq!(expected, got);
 
-
             let expected = E::Newtype(1);
             let value = lua.load(
                 r#"
                 a = {}
                 a["Newtype"] = 1
+                return a
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+
+            let expected = E::Array(vec![10, 20, 30]);
+            let value = lua.load(
+                r#"
+                a = {}
+                a["Array"] = {10, 20, 30}
                 return a
             "#).eval().unwrap();
             let got = from_value(value).unwrap();
@@ -378,6 +498,75 @@ mod tests {
                 a = {}
                 a["Struct"] = {}
                 a["Struct"]["a"] = 1
+                return a
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+        });
+    }
+
+    #[test]
+    fn test_enum_untagged() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        #[serde(untagged)]
+        enum E {
+            Unit,
+            Newtype(u32),
+            Tuple(u32, u32),
+            Array(Vec<u32>),
+            Struct { a: u32 },
+            Table(std::collections::HashMap<String, u32>),
+        }
+
+        let lua = Lua::new();
+        lua.context(|lua| {
+            let expected = E::Unit;
+            let value = lua.load(
+                r#"
+                return
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+
+            let expected = E::Newtype(1);
+            let value = lua.load(
+                r#"
+                return 1
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+
+            let expected = E::Tuple(1, 2);
+            let value = lua.load(
+                r#"
+                return {1, 2}
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+
+            let expected = E::Array(vec![10, 20, 30]);
+            let value = lua.load(
+                r#"
+                return {10, 20, 30}
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+
+            let expected = E::Struct { a: 1 };
+            let value = lua.load(
+                r#"
+                a = {}
+                a["a"] = 1
+                return a
+            "#).eval().unwrap();
+            let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+
+            let expected = E::Table(vec![("b".to_string(), 3)].into_iter().collect());
+            let value = lua.load(
+                r#"
+                a = {}
+                a["b"] = 3
                 return a
             "#).eval().unwrap();
             let got = from_value(value).unwrap();
