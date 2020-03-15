@@ -30,7 +30,7 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
                         len += 1
                     }
                 }
-                if v.len()? as usize != len {
+                if len == 0 || v.len()? as usize != len {
                     return self.deserialize_map(visitor)
                 }
                 self.deserialize_tuple(len, visitor)
@@ -358,6 +358,15 @@ mod tests {
         use serde::private::de::Content;
         let lua = Lua::new();
         lua.context(|lua| {
+            let expected = Content::Map(vec![]);
+            let value = lua.load(
+                r#"
+                a = {}
+                return a
+            "#).eval().unwrap();
+            let got = from_value::<Content>(value).unwrap();
+            assert_eq!(format!("{:?}", expected), format!("{:?}", got));
+
             let expected = Content::Seq(vec![Content::I64(10), Content::I64(20), Content::I64(30), Content::I64(40)]);
             let value = lua.load(
                 r#"
