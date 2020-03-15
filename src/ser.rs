@@ -374,9 +374,16 @@ mod tests {
         struct Test {
             int: u32,
             seq: Vec<&'static str>,
+            map: std::collections::HashMap<i32, i32>,
+            empty: Vec<()>,
         }
 
-        let test = Test { int: 1, seq: vec!["a", "b"] };
+        let test = Test {
+            int: 1,
+            seq: vec!["a", "b"],
+            map: vec![(1, 2), (4, 1)].into_iter().collect(),
+            empty: vec![]
+        };
 
         let lua = Lua::new();
         lua.context(|lua| {
@@ -387,16 +394,20 @@ mod tests {
                 assert(value["int"] == 1)
                 assert(value["seq"][1] == "a")
                 assert(value["seq"][2] == "b")
+                assert(value["map"][1] == 2)
+                assert(value["map"][4] == 1)
+                assert(next(value["empty"]) == nil)
             "#).exec()
         }).unwrap()
     }
 
     #[test]
-    fn test_num() {
+    fn test_enum() {
         #[derive(Serialize)]
         enum E {
             Unit,
             Newtype(u32),
+            Array(Vec<u32>),
             Tuple(u32, u32),
             Struct { a: u32},
         }
@@ -418,6 +429,15 @@ mod tests {
                 assert(value["Newtype"] == 1)
             "#).exec().unwrap();
 
+            let t = E::Array(vec![10, 20, 30]);
+            let value = to_value(lua, &t).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
+                assert(value["Array"][1] == 10)
+                assert(value["Array"][2] == 20)
+                assert(value["Array"][3] == 30)
+            "#).exec().unwrap();
+
             let t = E::Tuple(1, 2);
             let value = to_value(lua, &t).unwrap();
             lua.globals().set("value", value).unwrap();
@@ -431,6 +451,68 @@ mod tests {
             lua.globals().set("value", value).unwrap();
             lua.load(r#"
                 assert(value["Struct"]["a"] == 1)
+            "#).exec()
+        }).unwrap();
+    }
+
+    #[test]
+    fn test_enum_untagged() {
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        enum E {
+            Unit,
+            Newtype(u32),
+            Tuple(u32, u32),
+            Array(Vec<u32>),
+            Struct { a: u32 },
+            Table(std::collections::HashMap<String, u32>),
+        }
+
+        let lua = Lua::new();
+        lua.context(|lua| {
+            let u = E::Unit;
+            let value = to_value(lua, &u).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
+                assert(value == nil)
+            "#).exec().unwrap();
+
+            let n = E::Newtype(1);
+            let value = to_value(lua, &n).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
+                assert(value == 1)
+            "#).exec().unwrap();
+
+            let t = E::Tuple(1, 2);
+            let value = to_value(lua, &t).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
+                assert(value[1] == 1)
+                assert(value[2] == 2)
+            "#).exec().unwrap();
+
+            let t = E::Array(vec![10, 20, 30]);
+            let value = to_value(lua, &t).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
+                assert(value[1] == 10)
+                assert(value[2] == 20)
+                assert(value[3] == 30)
+            "#).exec().unwrap();
+
+            let s = E::Struct { a: 1 };
+            let value = to_value(lua, &s).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
+                assert(value["a"] == 1)
+            "#).exec().unwrap();
+
+            let s = E::Table(vec![("b".to_string(), 3)].into_iter().collect());
+            let value = to_value(lua, &s).unwrap();
+            lua.globals().set("value", value).unwrap();
+            lua.load(r#"
+                assert(value["b"] == 3)
             "#).exec()
         }).unwrap();
     }
