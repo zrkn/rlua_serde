@@ -6,6 +6,7 @@ use rlua::{Value, TablePairs, TableSequence};
 use error::{Error, Result};
 
 #[cfg(feature = "arrays")]
+#[inline]
 fn table_is_array(t: &rlua::Table) -> Result<bool> {
     let mt_arr: Option<bool> = if let Some(mt) = t.get_metatable() {
         mt.get("__array")?
