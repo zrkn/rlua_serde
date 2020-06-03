@@ -428,7 +428,27 @@ mod tests {
             "#).eval().unwrap();
             let json: serde_json::Value = from_value(value).unwrap();
             let got = serde_json::to_string(&json).unwrap();
+            assert_eq!(expected, got);
+            
+            let expected = String::from("[]");
+            let value = lua.load(
+            r#"
+            a = {}
+            setmetatable(a, {__array = true})
+            return a
+            "#).eval().unwrap();
+            let json: serde_json::Value = from_value(value).unwrap();
+            let got = serde_json::to_string(&json).unwrap();  
+            assert_eq!(expected, got);
 
+            let expected = String::from("{}");
+            let value = lua.load(
+                r#"
+                a = {}
+                return a
+                "#).eval().unwrap();
+            let json: serde_json::Value = from_value(value).unwrap();
+            let got = serde_json::to_string(&json).unwrap();
             assert_eq!(expected, got);
         });
     }
