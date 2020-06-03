@@ -5,6 +5,21 @@ use rlua::{Value, TablePairs, TableSequence};
 
 use error::{Error, Result};
 
+#[cfg(feature = "arrays")]
+fn table_is_array(t: &rlua::Table) -> Result<bool> {
+    let mt_arr: Option<bool> = if let Some(mt) = t.get_metatable() {
+        mt.get("__array")?
+    } else {
+        None
+    };
+
+    Ok(mt_arr.unwrap_or(false))
+}
+
+#[cfg(not(feature = "arrays"))]
+fn table_is_array(_t: &rlua::Table) -> Result<bool> {
+    Ok(false)
+}
 
 pub struct Deserializer<'lua> {
     pub value: Value<'lua>,
@@ -25,13 +40,26 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
             Value::String(v) => visitor.visit_str(v.to_str()?),
             Value::Table(v) => {
                 let len = v.len()? as usize;
-                let mut deserializer = MapDeserializer(v.pairs(), None);
-                let map = visitor.visit_map(&mut deserializer)?;
-                let remaining = deserializer.0.count();
-                if remaining == 0 {
-                    Ok(map)
+                if !table_is_array(&v)? {
+                    println!("Desering map");
+                    let mut deserializer = MapDeserializer(v.pairs(), None);
+                    let map = visitor.visit_map(&mut deserializer)?;
+                    let remaining = deserializer.0.count();
+                    if remaining == 0 {
+                        Ok(map)
+                    } else {
+                        Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                    }
                 } else {
-                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                    println!("Desering array");
+                    let mut deserializer = SeqDeserializer(v.sequence_values());
+                    let seq = visitor.visit_seq(&mut deserializer)?;
+                    let remaining = deserializer.0.count();
+                    if remaining == 0 {
+                        Ok(seq)
+                    } else {
+                        Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                    }
                 }
             },
             _ => Err(serde::de::Error::custom("invalid value type")),
@@ -381,6 +409,25 @@ mod tests {
                 return a
             "#).eval().unwrap();
             let got = from_value(value).unwrap();
+            assert_eq!(expected, got);
+        });
+    }
+
+    #[cfg(feature = "arrays")]
+    #[test]
+    fn test_array() {
+        let lua = Lua::new();
+        lua.context(|lua| {
+            let expected = String::from("[1,2,4,8]");
+            let value = lua.load(
+                r#"
+                a = {1,2,4,8}
+                setmetatable(a, {__array = true})
+                return a
+            "#).eval().unwrap();
+            let json: serde_json::Value = from_value(value).unwrap();
+            let got = serde_json::to_string(&json).unwrap();
+
             assert_eq!(expected, got);
         });
     }
