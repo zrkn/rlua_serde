@@ -42,7 +42,6 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
             Value::Table(v) => {
                 let len = v.len()? as usize;
                 if !table_is_array(&v)? {
-                    println!("Desering map");
                     let mut deserializer = MapDeserializer(v.pairs(), None);
                     let map = visitor.visit_map(&mut deserializer)?;
                     let remaining = deserializer.0.count();
@@ -52,7 +51,6 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
                         Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
                     }
                 } else {
-                    println!("Desering array");
                     let mut deserializer = SeqDeserializer(v.sequence_values());
                     let seq = visitor.visit_seq(&mut deserializer)?;
                     let remaining = deserializer.0.count();
