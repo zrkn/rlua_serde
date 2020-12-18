@@ -1,10 +1,9 @@
 use serde;
 
-use rlua::{Context, Value, Table, String as LuaString};
+use rlua::{Context, String as LuaString, Table, Value};
 
-use to_value;
 use error::{Error, Result};
-
+use to_value;
 
 pub struct Serializer<'lua> {
     pub lua: Context<'lua>,
@@ -14,12 +13,12 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
     type Ok = Value<'lua>;
     type Error = Error;
 
-    type SerializeSeq           = SerializeVec<'lua>;
-    type SerializeTuple         = SerializeVec<'lua>;
-    type SerializeTupleStruct   = SerializeVec<'lua>;
-    type SerializeTupleVariant  = SerializeTupleVariant<'lua>;
-    type SerializeMap           = SerializeMap<'lua>;
-    type SerializeStruct        = SerializeMap<'lua>;
+    type SerializeSeq = SerializeVec<'lua>;
+    type SerializeTuple = SerializeVec<'lua>;
+    type SerializeTupleStruct = SerializeVec<'lua>;
+    type SerializeTupleVariant = SerializeTupleVariant<'lua>;
+    type SerializeMap = SerializeMap<'lua>;
+    type SerializeStruct = SerializeMap<'lua>;
     type SerializeStructVariant = SerializeStructVariant<'lua>;
 
     #[inline]
@@ -91,7 +90,9 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
 
     #[inline]
     fn serialize_bytes(self, value: &[u8]) -> Result<Value<'lua>> {
-        Ok(Value::Table(self.lua.create_sequence_from(value.iter().cloned())?))
+        Ok(Value::Table(
+            self.lua.create_sequence_from(value.iter().cloned())?,
+        ))
     }
 
     #[inline]
@@ -106,25 +107,31 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
 
     #[inline]
     fn serialize_unit_variant(
-        self, _name: &'static str, _variant_index: u32, variant: &'static str
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
     ) -> Result<Value<'lua>> {
         self.serialize_str(variant)
     }
 
     #[inline]
-    fn serialize_newtype_struct<T>(
-        self, _name: &'static str, value: &T
-    ) -> Result<Value<'lua>>
-        where T: ?Sized + serde::Serialize,
+    fn serialize_newtype_struct<T>(self, _name: &'static str, value: &T) -> Result<Value<'lua>>
+    where
+        T: ?Sized + serde::Serialize,
     {
         value.serialize(self)
     }
 
     fn serialize_newtype_variant<T>(
-        self, _name: &'static str, _variant_index: u32,
-        variant: &'static str, value: &T,
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        value: &T,
     ) -> Result<Value<'lua>>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         let table = self.lua.create_table()?;
         let variant = self.lua.create_string(variant)?;
@@ -140,7 +147,8 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
 
     #[inline]
     fn serialize_some<T>(self, value: &T) -> Result<Value<'lua>>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         value.serialize(self)
     }
@@ -159,14 +167,19 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
     }
 
     fn serialize_tuple_struct(
-        self, _name: &'static str, len: usize,
+        self,
+        _name: &'static str,
+        len: usize,
     ) -> Result<Self::SerializeTupleStruct> {
         self.serialize_seq(Some(len))
     }
 
     fn serialize_tuple_variant(
-        self, _name: &'static str, _variant_index: u32,
-        variant: &'static str, _len: usize,
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
         let name = self.lua.create_string(variant)?;
         let table = self.lua.create_table()?;
@@ -174,7 +187,7 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
             lua: self.lua,
             idx: 1,
             name,
-            table
+            table,
         })
     }
 
@@ -192,8 +205,11 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
     }
 
     fn serialize_struct_variant(
-        self, _name: &'static str, _variant_index: u32,
-        variant: &'static str, _len: usize,
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
         let name = self.lua.create_string(variant)?;
         let table = self.lua.create_table()?;
@@ -203,9 +219,7 @@ impl<'lua> serde::Serializer for Serializer<'lua> {
             table,
         })
     }
-
 }
-
 
 pub struct SerializeVec<'lua> {
     lua: Context<'lua>,
@@ -218,7 +232,8 @@ impl<'lua> serde::ser::SerializeSeq for SerializeVec<'lua> {
     type Error = Error;
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         self.table.set(self.idx, to_value(self.lua, value)?)?;
         self.idx += 1;
@@ -235,7 +250,8 @@ impl<'lua> serde::ser::SerializeTuple for SerializeVec<'lua> {
     type Error = Error;
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         serde::ser::SerializeSeq::serialize_element(self, value)
     }
@@ -250,7 +266,8 @@ impl<'lua> serde::ser::SerializeTupleStruct for SerializeVec<'lua> {
     type Error = Error;
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         serde::ser::SerializeSeq::serialize_element(self, value)
     }
@@ -259,7 +276,6 @@ impl<'lua> serde::ser::SerializeTupleStruct for SerializeVec<'lua> {
         serde::ser::SerializeSeq::end(self)
     }
 }
-
 
 pub struct SerializeTupleVariant<'lua> {
     lua: Context<'lua>,
@@ -273,7 +289,8 @@ impl<'lua> serde::ser::SerializeTupleVariant for SerializeTupleVariant<'lua> {
     type Error = Error;
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         self.table.set(self.idx, to_value(self.lua, value)?)?;
         self.idx += 1;
@@ -287,11 +304,10 @@ impl<'lua> serde::ser::SerializeTupleVariant for SerializeTupleVariant<'lua> {
     }
 }
 
-
 pub struct SerializeMap<'lua> {
     lua: Context<'lua>,
     table: Table<'lua>,
-    next_key: Option<Value<'lua>>
+    next_key: Option<Value<'lua>>,
 }
 
 impl<'lua> serde::ser::SerializeMap for SerializeMap<'lua> {
@@ -299,14 +315,16 @@ impl<'lua> serde::ser::SerializeMap for SerializeMap<'lua> {
     type Error = Error;
 
     fn serialize_key<T>(&mut self, key: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         self.next_key = Some(to_value(self.lua, key)?);
         Ok(())
     }
 
     fn serialize_value<T>(&mut self, value: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         let key = self.next_key.take();
         // Panic because this indicates a bug in the program rather than an
@@ -326,7 +344,8 @@ impl<'lua> serde::ser::SerializeStruct for SerializeMap<'lua> {
     type Error = Error;
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
         serde::ser::SerializeMap::serialize_key(self, key)?;
         serde::ser::SerializeMap::serialize_value(self, value)
@@ -336,7 +355,6 @@ impl<'lua> serde::ser::SerializeStruct for SerializeMap<'lua> {
         serde::ser::SerializeMap::end(self)
     }
 }
-
 
 pub struct SerializeStructVariant<'lua> {
     lua: Context<'lua>,
@@ -349,10 +367,10 @@ impl<'lua> serde::ser::SerializeStructVariant for SerializeStructVariant<'lua> {
     type Error = Error;
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
-        where T: ?Sized + serde::Serialize,
+    where
+        T: ?Sized + serde::Serialize,
     {
-        self.table
-            .set(key, to_value(self.lua, value)?)?;
+        self.table.set(key, to_value(self.lua, value)?)?;
         Ok(())
     }
 
@@ -365,8 +383,9 @@ impl<'lua> serde::ser::SerializeStructVariant for SerializeStructVariant<'lua> {
 
 #[cfg(test)]
 mod tests {
-    use rlua::Lua;
     use super::*;
+    use rlua::Lua;
+    use ToLuaValue;
 
     #[test]
     fn test_struct() {
@@ -376,7 +395,10 @@ mod tests {
             seq: Vec<&'static str>,
         }
 
-        let test = Test { int: 1, seq: vec!["a", "b"] };
+        let test = Test {
+            int: 1,
+            seq: vec!["a", "b"],
+        };
 
         let lua = Lua::new();
         lua.context(|lua| {
@@ -387,8 +409,11 @@ mod tests {
                 assert(value["int"] == 1)
                 assert(value["seq"][1] == "a")
                 assert(value["seq"][2] == "b")
-            "#).exec()
-        }).unwrap()
+            "#,
+            )
+            .exec()
+        })
+        .unwrap()
     }
 
     #[test]
@@ -398,7 +423,7 @@ mod tests {
             Unit,
             Newtype(u32),
             Tuple(u32, u32),
-            Struct { a: u32},
+            Struct { a: u32 },
         }
 
         let lua = Lua::new();
@@ -407,31 +432,47 @@ mod tests {
             let u = E::Unit;
             let value = to_value(lua, &u).unwrap();
             lua.globals().set("value", value).unwrap();
-            lua.load(r#"
+            lua.load(
+                r#"
                 assert(value == "Unit")
-            "#).exec().unwrap();
+            "#,
+            )
+            .exec()
+            .unwrap();
 
             let n = E::Newtype(1);
             let value = to_value(lua, &n).unwrap();
             lua.globals().set("value", value).unwrap();
-            lua.load(r#"
+            lua.load(
+                r#"
                 assert(value["Newtype"] == 1)
-            "#).exec().unwrap();
+            "#,
+            )
+            .exec()
+            .unwrap();
 
             let t = E::Tuple(1, 2);
-            let value = to_value(lua, &t).unwrap();
+            let value = lua.to_value(t).unwrap();
             lua.globals().set("value", value).unwrap();
-            lua.load(r#"
+            lua.load(
+                r#"
                 assert(value["Tuple"][1] == 1)
                 assert(value["Tuple"][2] == 2)
-            "#).exec().unwrap();
+            "#,
+            )
+            .exec()
+            .unwrap();
 
             let s = E::Struct { a: 1 };
             let value = to_value(lua, &s).unwrap();
             lua.globals().set("value", value).unwrap();
-            lua.load(r#"
+            lua.load(
+                r#"
                 assert(value["Struct"]["a"] == 1)
-            "#).exec()
-        }).unwrap();
+            "#,
+            )
+            .exec()
+        })
+        .unwrap();
     }
 }

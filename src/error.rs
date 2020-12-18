@@ -1,10 +1,9 @@
-use std::fmt;
 use std::error::Error as StdError;
+use std::fmt;
 use std::result::Result as StdResult;
 
-use serde;
 use rlua::Error as LuaError;
-
+use serde;
 
 #[derive(Debug)]
 pub struct Error(LuaError);
@@ -40,7 +39,7 @@ impl serde::ser::Error for Error {
         Error(LuaError::ToLuaConversionError {
             from: "serialize",
             to: "value",
-            message: Some(format!("{}", msg))
+            message: Some(format!("{}", msg)),
         })
     }
 }
@@ -50,7 +49,7 @@ impl serde::de::Error for Error {
         Error(LuaError::FromLuaConversionError {
             from: "value",
             to: "deserialize",
-            message: Some(format!("{}", msg))
+            message: Some(format!("{}", msg)),
         })
     }
 }
